@@ -69,7 +69,7 @@ class Page:
     # login using credentials from config
     def login(self):
         config = configparser.ConfigParser()
-        config.read("~/airflow/consum/consum_project/config.ini")
+        config.read("consum_project/config.ini")
         username = self.driver.find_element_by_id("login")
         username.clear()
         username.send_keys(config["credentials"].get("user"))
