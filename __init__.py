@@ -9,9 +9,6 @@ import csv
 import os
 from pathlib import Path
 
-
-# my config
-#from config import credentials
 import configparser
 
 
@@ -71,16 +68,14 @@ class Page:
 
     # login using credentials from config
     def login(self):
-        #config = configparser.ConfigParser()
-        #config.read("~/airflow/consum/consum_project/config.ini")
+        config = configparser.ConfigParser()
+        config.read("~/airflow/consum/consum_project/config.ini")
         username = self.driver.find_element_by_id("login")
         username.clear()
-        #username.send_keys(config["credentials"].get("user"))
-        username.send_keys("42399125M")
+        username.send_keys(config["credentials"].get("user"))
         password = self.driver.find_element_by_id("password")
         password.clear()
-        #password.send_keys(config["credentials"].get("pass"))
-        password.send_keys("Valentina2021")
+        password.send_keys(config["credentials"].get("pass"))
 
         button = self.driver.find_element_by_class_name("btn_generico_orange")
         ActionChains(self.driver).move_to_element(button).click(button).perform()
