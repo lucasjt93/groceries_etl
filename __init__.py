@@ -1,5 +1,3 @@
-""" Scraps the consum web page to download tickets as PDF files to a local folder """
-
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
@@ -7,13 +5,13 @@ from selenium.common.exceptions import NoSuchElementException
 import time
 import csv
 import os
-from pathlib import Path
-
 import configparser
+from pathlib import Path
 
 
 class Page:
-    def __init__(self):
+    """ Extract: Scraps the consum web page to download tickets as PDF files to a local folder """
+    def __init__(self) -> None:
         self.driver = None
         self.tickets = list()
         self.stored = list()
@@ -21,11 +19,11 @@ class Page:
         self.pdf_path = Path("consum_project/data/tickets_pdf")
 
     @staticmethod
-    def timer():
+    def timer() -> time.time:
         return time.time()
 
     # get stored tickets from csv
-    def stored_tickets(self):
+    def stored_tickets(self) -> None:
         if self.stored_path.exists():
             with open(self.stored_path, mode="r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.reader(f)
@@ -34,7 +32,7 @@ class Page:
                     self.tickets.append(row[0])
 
     # post new tickets to stored files
-    def new_tickets(self):
+    def new_tickets(self) -> None:
         with open(self.stored_path, mode="a", encoding="utf-8-sig", newline="") as f:
             for ticket in self.tickets:
                 if ticket not in self.stored:
@@ -42,7 +40,7 @@ class Page:
         print(f"Database updated with {len(self.tickets) - len(self.stored)} tickets")
 
     # get webdriver for chrome
-    def get_driver(self):
+    def get_driver(self) -> None:
         # set webdriver options
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")
@@ -58,7 +56,7 @@ class Page:
         self.driver = driver
 
     # go to consum page
-    def go_to_page(self):
+    def go_to_page(self) -> None:
         self.driver.get("https://mundoconsum.consum.es/auth/index")
         assert "Consum" in self.driver.title
 
@@ -67,7 +65,7 @@ class Page:
         ActionChains(self.driver).move_to_element(button).click(button).perform()
 
     # login using credentials from config
-    def login(self):
+    def login(self) -> None:
         config = configparser.ConfigParser()
         config.read("consum_project/config.ini")
         username = self.driver.find_element_by_id("login")
@@ -81,7 +79,7 @@ class Page:
         ActionChains(self.driver).move_to_element(button).click(button).perform()
 
     # rename pdf after download to ticket id
-    def rename_file(self, ticket_id):
+    def rename_file(self, ticket_id) -> None:
         time.sleep(1)  # wait for ticket to download
         while True:
             try:
@@ -94,7 +92,7 @@ class Page:
                 continue
 
     # perform actions to download tickets
-    def download_ticket(self, ticket_id):
+    def download_ticket(self, ticket_id) -> None:
         menu = self.driver.find_element_by_id("menu-puntos")
         ActionChains(self.driver).move_to_element(menu).click(menu).perform()
         download = self.driver.find_element_by_id("dropdown1")
@@ -103,7 +101,7 @@ class Page:
         self.rename_file(ticket_id)
         self.driver.back()  # go back to tickets list
 
-    def get_tickets(self):
+    def get_tickets(self) -> None:
         self.driver.get("https://mundoconsum.consum.es/es/personal/tickets")  # instantiate tickets object
         self.driver.get("https://nomastickets.consum.es/app/mytickets.html")  # move to tickets frame
         assert "Tickets" in self.driver.title
@@ -146,10 +144,10 @@ class Page:
             print("Checking, relax :)")
 
     # close driver
-    def teardown(self):
+    def teardown(self) -> None:
         self.driver.close()
 
-    def scrap(self):
+    def scrap(self) -> None:
         # lets take the time
         start_time = self.timer()
         print(f"Started at {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(start_time))}")
@@ -175,14 +173,30 @@ class Page:
         print(f"Finalized at {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(end_time))}")
         print(f"Total time: {time.strftime('%M:%SZ', time.localtime(end_time - start_time))}")
 
+
+class TicketParser:
+    """ Transform: Parse the tickets.txt to .sql file to upload to postgresql """
+    def __init__(self) -> None:
+        self.tickets_path = Path("consum_project/data/tickets_pdf")
+        self.tickets_txt = list()
+
+    # load tickets.txt into class attributes
+    def load_txt(self) -> None:
+        txt_files = os.listdir(self.tickets_path)
+        self.tickets_txt = [txt for txt in txt_files if txt[-4:] == ".txt"]  # Only .txt files
+
+
 # instantiate object for calling from DAG
-def scrapper():
+def scrapper() -> None:
     consum = Page()
     consum.scrap()
 
 
 if __name__ == '__main__':
-    """ Scrape consum page to retrieve tickets """
-
+    # Scrape consum page to retrieve tickets
     consum = Page()
     consum.scrap()
+
+    parser = TicketParser()
+    parser.load_txt()
+    print(parser.tickets_txt)
