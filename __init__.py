@@ -75,23 +75,7 @@ class Page:
     def __init__(self) -> None:
         self.driver = None
         self.tickets = list()
-        self.stored = list()
-        self.stored_2 = None
-        self.stored_path = Path("consum_project/data/tickets.csv")
         self.pdf_path = Path("consum_project/data/tickets_pdf")
-
-    @staticmethod
-    def timer() -> time.time:
-        return time.time()
-
-    # DEPRECATED! get stored tickets from csv 
-    def stored_tickets(self) -> None:
-        if self.stored_path.exists():
-            with open(self.stored_path, mode="r", encoding="utf-8-sig", newline="") as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    self.stored.append(row[0])
-                    self.tickets.append(row[0])
 
     # get stored tickets from postgres
     def stored_db(self, db) -> None:
@@ -103,19 +87,10 @@ class Page:
     # post tickets to postgres
     def ticket_to_db(self, db, id) -> None:
         statement = f"INSERT INTO tickets (id, created_at) VALUES ({id}, now());"
-        print(statement)
         db.prepare_conn()
         db.cur.execute(statement)
         db.conn.commit()
         db.close()
-
-    # DEPRECATED! post new tickets to stored files
-    def new_tickets(self) -> None:
-        with open(self.stored_path, mode="a", encoding="utf-8-sig", newline="") as f:
-            for ticket in self.tickets:
-                if ticket not in self.stored:
-                    f.write(ticket + "\n")
-        print(f"Database updated with {len(self.tickets) - len(self.stored)} tickets")
 
     # get webdriver for chrome
     def get_driver(self) -> None:
@@ -197,6 +172,7 @@ class Page:
                 if int(ticket_id) not in self.tickets:  # check that ticket is not yet scrapped
                     self.tickets.append(int(ticket_id))
                     self.ticket_to_db(db, ticket_id)
+                    
                     while True:
                         try:
                             ticket = self.driver.find_element_by_id(ticket_id)  # retrieve ticket element with id
@@ -227,12 +203,11 @@ class Page:
 
     def scrap(self) -> None:
         # lets take the time
-        start_time = self.timer()
-        print(f"Started at {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(start_time))}")
+        start_time = time.time()
+        print(f"Started at {time.strftime('%Y-%m-%d %H:%M:%SZ', time.localtime(start_time))}")
 
         # get the driver ready + configs
         self.get_driver()
-        #self.stored_tickets()
         self.stored_db(db)
 
         # scrapes the page
@@ -240,17 +215,14 @@ class Page:
         self.login()
         self.get_tickets()
 
-        # add new tickets to the csv file
-        #self.new_tickets()
-
         # close the driver
         self.teardown()
 
         # stop timer
-        end_time = self.timer()
+        end_time = time.time()
 
-        print(f"Finalized at {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(end_time))}")
-        print(f"Total time: {time.strftime('%M:%SZ', time.localtime(end_time - start_time))}")
+        print(f"Finalized at {time.strftime('%Y-%m-%d %H:%M:%SZ', time.localtime(end_time))}")
+        print(f"Total time: {end_time - start_time}")
 
 
 class TicketParser:
@@ -259,7 +231,7 @@ class TicketParser:
 
     def __init__(self) -> None:
         self.tickets_path = Path("consum_project/data/tickets_pdf")
-        self.tickets_txt = list()
+        self.tickets_txt = None
 
     # load tickets.txt into class attributes
     def load_txt(self) -> None:
