@@ -10,6 +10,11 @@ from pathlib import Path
 
 import psycopg2
 
+# helpers
+def list_to_string(l) -> str:
+        str1 = " "
+        return str1.join(l)
+
 class Db:
     """ Connects to postgreSQL db """
     def __init__(self) -> None:
@@ -45,17 +50,12 @@ class Db:
             self.conn.close
         else:
             raise Exception("No connection established")
-    
-    @staticmethod
-    def list_to_string(l) -> str:
-        str1 = " "
-        return str1.join(l)
 
     def create_schema(self) -> None:
         if self.cur:
             with open("consum_project/schema.sql") as reader:  # open schema.sql file
                 schema = [line for line in reader]
-            str_schema = self.list_to_string(schema)
+            str_schema = list_to_string(schema)
             schema_split = str_schema.split(";")  # separate SQL statements
             for sch in schema_split[:-1]:
                 statement = sch.replace("\n", "")
@@ -67,6 +67,7 @@ class Db:
         self.config()
         self.connect()
         self.cursor()
+        self.create_schema()
 
 db = Db()
 
@@ -238,6 +239,57 @@ class TicketParser:
         txt_files = os.listdir(self.tickets_path)
         self.tickets_txt = [txt for txt in txt_files if txt[-4:] == ".txt"]  # Only .txt files
 
+    # parse products data from tickets
+    def get_products(self, ticket_parsed) -> dict(list()):
+        parsed = dict()
+        quantity = list()
+        product = list()
+        pvp = list()
+        total = list()
+       
+        for n in range(7, len(ticket_parsed)):  # parsed[7] is where the products start in the ticket
+            line = ticket_parsed[n]  # current line in ticket
+
+            if any(code in line for code in ("2902614104014", "2911866831005")):   # this is where the product list ends
+                break
+            
+            quantity.append(line[0:5])
+            product.append(line[5:28])
+            pvp.append(line[28:32])
+            total.append(line[32:38])
+        
+        parsed["quantity"] = quantity
+        parsed["product"] = product
+        parsed["pvp"] = pvp
+        parsed["total"] = total
+
+        return parsed
+
+    # TODO load to db
+    def post_to_db(self, parsed_products, db, ticket_id):
+        statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES "
+        print(len(parsed_products["product"]))
+        for n in range(len(parsed_products["product"])):
+            for i in parsed_products.keys():
+                print(i, parsed_products[i][n].strip())
+    
+            #db.prepare_conn()
+            #db.cur.execute(statement)
+            #db.conn.commit()
+            #db.close()
+
+
+    def read_txt(self) -> None:
+        for txt in self.tickets_txt:
+            print("ticket", txt)
+            path_to_txt = os.path.join(self.tickets_path, f"{txt}")
+            with open(f"{path_to_txt}") as ticket:
+                t = [line for line in ticket]
+            parsed = self.get_products(t)
+            self.post_to_db(parsed, db, txt)
+
+
+
 
 # instantiate object for calling from DAG
 def scrapper() -> None:
@@ -247,8 +299,9 @@ def scrapper() -> None:
 
 if __name__ == '__main__':
     # Scrape consum page to retrieve tickets
-    consum = Page()
-    consum.scrap()
+    #consum = Page()
+    #consum.scrap()
 
-    #parser = TicketParser()
-    #parser.load_txt()
+    parser = TicketParser()
+    parser.load_txt()
+    parser.read_txt()
