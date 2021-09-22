@@ -164,8 +164,7 @@ class Page:
 
 
 class TicketParser:
-    """ Transform: Parse the tickets.txt to .sql file to upload to postgresql """
-    # TODO: Finish parser after finishing db
+    """ Transform: Parse the tickets.txt to .sql file to upload to postgres """
 
     def __init__(self) -> None:
         self.tickets_path = Path("consum_project/data/tickets_pdf")
@@ -175,9 +174,19 @@ class TicketParser:
     def load_txt(self) -> None:
         txt_files = os.listdir(self.tickets_path)
         self.tickets_txt = [txt for txt in txt_files if txt[-4:] == ".txt"]  # Only .txt files
+    
+    def read_txt(self) -> None:
+        for txt in self.tickets_txt:
+            print("ticket", txt)
+            path_to_txt = os.path.join(self.tickets_path, f"{txt}")
+            with open(f"{path_to_txt}") as ticket:
+                # TODO add conidition to only parse tickets not in products table
+                t = [line for line in ticket]
+            parsed = self.get_products(t)
+            self.post_to_db(parsed, txt[:-4])
 
     # parse products data from tickets
-    def get_products(self, ticket_parsed) -> dict(list()):
+    def get_products(self, ticket_parsed) -> dict():
         parsed = dict()
         quantity = list()
         product = list()
@@ -204,25 +213,19 @@ class TicketParser:
 
     # TODO load to db
     def post_to_db(self, parsed_products, ticket_id):
-        statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES "
-        print(len(parsed_products["product"]))
         for n in range(len(parsed_products["product"])):
-            for i in parsed_products.keys():
-                print(i, parsed_products[i][n].strip())  # data parsed to add to statement TODO complete statement and send to db
-    
+            statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES {ticket_id}, "
+            for columns in parsed_products.keys():
+                statement += f"{parsed_products[columns][n].strip()}, "
+            statement = statement. strip()[:-1] + ";"
+            print(statement)
+            del statement
+            # TODO sent statement to db
+
             #db.prepare_conn()
             #db.cur.execute(statement)
             #db.conn.commit()
             #db.close()
-
-    def read_txt(self) -> None:
-        for txt in self.tickets_txt:
-            print("ticket", txt)
-            path_to_txt = os.path.join(self.tickets_path, f"{txt}")
-            with open(f"{path_to_txt}") as ticket:
-                t = [line for line in ticket]
-            parsed = self.get_products(t)
-            self.post_to_db(parsed, txt)
 
 
 
