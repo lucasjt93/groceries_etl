@@ -8,6 +8,7 @@ import configparser
 from pathlib import Path
 
 from db import db, err
+from psycopg2 import sql
 
 
 class Page:
@@ -19,14 +20,14 @@ class Page:
 
     # get stored tickets from postgres
     def stored_db(self) -> None:
-        db.cur.execute("SELECT id FROM tickets;")
+        db.cur.execute(sql.SQL("SELECT {field} FROM {table}").format(field=sql.Identifier("id"), table=sql.Identifier("tickets")))
         self.tickets = [int(item[0]) for item in db.cur.fetchall()]
+        print(self.tickets)
         db.close()
     
     # post tickets to postgres
     def ticket_to_db(self, id) -> None:
-        statement = f"INSERT INTO tickets (id, created_at) VALUES ({id}, now());"
-        db.cur.execute(statement)
+        db.cur.execute(sql.SQL("INSERT INTO {} values (%s, %s)").format(sql.Identifier("tickets")), [id, "now()"])
         db.conn.commit()
         db.close()
 
@@ -219,26 +220,21 @@ class TicketParser:
         errors = list()  # failed statements
 
         for n in range(len(parsed_products["product"])):
-            statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES ({ticket_id}, "
+            values = list()
+            values.append(ticket_id)
 
             for columns in parsed_products.keys():
                 value = parsed_products[columns][n].replace(",", ".").strip().replace("'", "")
-                if columns == "product":
-                    value = f"'{value}'"
                 if (value == "" or value == "-"):
-                    value = "Null"
-                statement += f"{value}, "
-            
-            statement = statement[:-2] + ");"
+                    value = None
+                values.append(value)
 
             try:
-                db.cur.execute(statement)
+                db.cur.execute(sql.SQL("INSERT INTO {} VALUES (%s, %s, %s, %s, %s)").format(sql.Identifier("products")), values)
                 db.conn.commit()
-            except err:
-                errors.append(statement)
+            except err as error:
+                errors.append(error)
                 db.conn.rollback()
-            
-            del statement
 
         return errors if errors else None
 
