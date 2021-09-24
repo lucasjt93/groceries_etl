@@ -61,3 +61,4 @@ class Db:
         self.create_schema()
 
 db = Db()
+err = psycopg2.DatabaseError

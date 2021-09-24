@@ -7,7 +7,7 @@ import os
 import configparser
 from pathlib import Path
 
-from db import db
+from db import db, err
 
 
 class Page:
@@ -200,8 +200,8 @@ class TicketParser:
                 break
             
             quantity.append(line[0:5])
-            product.append(line[5:28])
-            pvp.append(line[28:32])
+            product.append(line[5:25])
+            pvp.append(line[26:32])
             total.append(line[32:38])
         
         parsed["quantity"] = quantity
@@ -214,18 +214,22 @@ class TicketParser:
     # TODO load to db
     def post_to_db(self, parsed_products, ticket_id):
         for n in range(len(parsed_products["product"])):
-            statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES {ticket_id}, "
+            statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES ({ticket_id}, "
             for columns in parsed_products.keys():
-                statement += f"{parsed_products[columns][n].strip()}, "
-            statement = statement. strip()[:-1] + ";"
-            print(statement)
+                value = parsed_products[columns][n].replace(",", ".").strip().replace("'", "")
+                if columns == "product":
+                    value = f"'{value}'"
+                if (value == "" or value == "-"):
+                    value = "Null"
+                statement += f"{value}, "
+            statement = statement[:-2] + ");"
+            print(statement) # TODO finish error handling
+            try:
+                db.cur.execute(statement)
+                db.conn.commit()
+            except err as error:
+                print(error)
             del statement
-            # TODO sent statement to db
-
-            #db.prepare_conn()
-            #db.cur.execute(statement)
-            #db.conn.commit()
-            #db.close()
 
 
 
