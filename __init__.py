@@ -169,6 +169,7 @@ class TicketParser:
     def __init__(self) -> None:
         self.tickets_path = Path("consum_project/data/tickets_pdf")
         self.tickets_txt = None
+        self.errors = list()
 
     # load tickets.txt into class attributes
     def load_txt(self) -> None:
@@ -183,7 +184,9 @@ class TicketParser:
                 # TODO add conidition to only parse tickets not in products table
                 t = [line for line in ticket]
             parsed = self.get_products(t)
-            self.post_to_db(parsed, txt[:-4])
+            posted = self.post_to_db(parsed, txt[:-4])
+            if posted:
+                self.errors.append(posted)
 
     # parse products data from tickets
     def get_products(self, ticket_parsed) -> dict():
@@ -211,10 +214,13 @@ class TicketParser:
 
         return parsed
 
-    # TODO load to db
-    def post_to_db(self, parsed_products, ticket_id):
+    # load to db
+    def post_to_db(self, parsed_products, ticket_id) -> list():
+        errors = list()  # failed statements
+
         for n in range(len(parsed_products["product"])):
             statement = f"INSERT INTO products (ticket_id, quantity, product, pvp, total) VALUES ({ticket_id}, "
+
             for columns in parsed_products.keys():
                 value = parsed_products[columns][n].replace(",", ".").strip().replace("'", "")
                 if columns == "product":
@@ -222,15 +228,19 @@ class TicketParser:
                 if (value == "" or value == "-"):
                     value = "Null"
                 statement += f"{value}, "
+            
             statement = statement[:-2] + ");"
-            print(statement) # TODO finish error handling
+
             try:
                 db.cur.execute(statement)
                 db.conn.commit()
-            except err as error:
-                print(error)
+            except err:
+                errors.append(statement)
+                db.conn.rollback()
+            
             del statement
 
+        return errors if errors else None
 
 
 # instantiate object for calling from DAG
@@ -250,5 +260,6 @@ if __name__ == '__main__':
     parser = TicketParser()
     parser.load_txt()
     parser.read_txt()
+    print(parser.errors)
 
     db.close()
