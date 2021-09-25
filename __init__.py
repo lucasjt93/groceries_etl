@@ -10,34 +10,34 @@ from pathlib import Path
 from db import db, err
 from psycopg2 import sql
 
+# path to folder where tickets are stored
+pdf_path = Path("consum_project/data/tickets_pdf")
+
 
 class Page:
     """ Extract: Scraps the consum web page to download tickets as PDF files to a local folder """
+
     def __init__(self) -> None:
-        self.driver = None
-        self.tickets = list()
-        self.pdf_path = Path("consum_project/data/tickets_pdf")
+        self.driver = self.get_driver(pdf_path)
+        self.tickets = self.stored_db()
 
     # get stored tickets from postgres
-    def stored_db(self) -> None:
+    def stored_db(self) -> list():
         db.cur.execute(sql.SQL("SELECT {field} FROM {table}").format(field=sql.Identifier("id"), table=sql.Identifier("tickets")))
-        self.tickets = [int(item[0]) for item in db.cur.fetchall()]
-        print(self.tickets)
-        db.close()
+        return [int(item[0]) for item in db.cur.fetchall()]
     
     # post tickets to postgres
     def ticket_to_db(self, id) -> None:
         db.cur.execute(sql.SQL("INSERT INTO {} values (%s, %s)").format(sql.Identifier("tickets")), [id, "now()"])
         db.conn.commit()
-        db.close()
 
     # get webdriver for chrome
-    def get_driver(self) -> None:
+    def get_driver(self, pdf) -> webdriver:
         # set webdriver options
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
-        prefs = {"download.default_directory": str(self.pdf_path)}
+        prefs = {"download.default_directory": str(pdf)}
         options.add_experimental_option("prefs", prefs)
         driver = webdriver.Chrome(
             executable_path=r"/usr/bin/chromedriver",
@@ -45,7 +45,7 @@ class Page:
         )
         driver.implicitly_wait(10)
         driver.maximize_window()
-        self.driver = driver
+        return driver
 
     # go to consum page
     def go_to_page(self) -> None:
@@ -69,14 +69,18 @@ class Page:
 
         button = self.driver.find_element_by_class_name("btn_generico_orange")
         ActionChains(self.driver).move_to_element(button).click(button).perform()
+    
+    def scroll_down(self) -> None:
+        ActionChains(self.driver).move_to_element(self.driver.find_element_by_class_name("pullUpLabel")).perform()
+        ActionChains(self.driver).drag_and_drop(self.driver.find_element_by_class_name("pullUpLabel"),self.driver.find_element_by_class_name("l10n-tickets")).perform()
 
     # rename pdf after download to ticket id
     def rename_file(self, ticket_id) -> None:
         time.sleep(1)  # wait for ticket to download
         while True:
             try:
-                old_file = os.path.join(self.pdf_path, "ticket.pdf")
-                new_file = os.path.join(self.pdf_path, f"{ticket_id}.pdf")
+                old_file = os.path.join(pdf_path, "ticket.pdf")
+                new_file = os.path.join(pdf_path, f"{ticket_id}.pdf")
                 time.sleep(1)
                 os.rename(old_file, new_file)
                 break
@@ -117,11 +121,7 @@ class Page:
                             ticket = self.driver.find_element_by_id(ticket_id)  # retrieve ticket element with id
                             break
                         except NoSuchElementException:  # this is for the reloading, i need to scroll down again
-                            ActionChains(self.driver).move_to_element(
-                                self.driver.find_element_by_class_name("pullUpLabel")).perform()
-                            ActionChains(self.driver).drag_and_drop(self.driver.find_element_by_class_name("pullUpLabel"),
-                                                                    self.driver.find_element_by_class_name(
-                                                                        "l10n-tickets")).perform()
+                            self.scroll_down()
 
                     ActionChains(self.driver).move_to_element(ticket).click(ticket).perform()  # enter ticket
                     try:
@@ -130,24 +130,13 @@ class Page:
                         ActionChains(self.driver).move_to_element(ticket).click(ticket).perform()  # make sure it enters
                         self.download_ticket(ticket_id)
 
-            # scroll down
-            ActionChains(self.driver).move_to_element(self.driver.find_element_by_class_name("pullUpLabel")).perform()
-            ActionChains(self.driver).drag_and_drop(self.driver.find_element_by_class_name("pullUpLabel"),
-                                                    self.driver.find_element_by_class_name("l10n-tickets")).perform()
+            self.scroll_down()
             print("Checking, relax :)")
-
-    # close driver
-    def teardown(self) -> None:
-        self.driver.close()
 
     def scrap(self) -> None:
         # lets take the time
         start_time = time.time()
         print(f"Started at {time.strftime('%Y-%m-%d %H:%M:%SZ', time.localtime(start_time))}")
-
-        # get the driver ready + configs
-        self.get_driver()
-        self.stored_db()
 
         # scrapes the page
         self.go_to_page()
@@ -155,7 +144,7 @@ class Page:
         self.get_tickets()
 
         # close the driver
-        self.teardown()
+        self.driver.close()
 
         # stop timer
         end_time = time.time()
@@ -168,21 +157,24 @@ class TicketParser:
     """ Transform: Parse the tickets.txt to .sql file to upload to postgres """
 
     def __init__(self) -> None:
-        self.tickets_path = Path("consum_project/data/tickets_pdf")
-        self.tickets_txt = None
+        self.products_loaded = self.loaded()
+        self.tickets_txt = self.load_txt()
         self.errors = list()
 
+    def loaded(self) -> list():
+        db.cur.execute(sql.SQL("SELECT DISTINCT({field}) FROM {table}").format(field=sql.Identifier("ticket_id"), table=sql.Identifier("products")))
+        return [int(item[0]) for item in db.cur.fetchall()]
+
     # load tickets.txt into class attributes
-    def load_txt(self) -> None:
-        txt_files = os.listdir(self.tickets_path)
-        self.tickets_txt = [txt for txt in txt_files if txt[-4:] == ".txt"]  # Only .txt files
+    def load_txt(self) -> list():
+        txt_files = os.listdir(pdf_path)
+        return [txt for txt in txt_files if txt[-4:] == ".txt" and int(txt[:-4]) not in self.products_loaded]  # Only .txt files
     
     def read_txt(self) -> None:
         for txt in self.tickets_txt:
             print("ticket", txt)
-            path_to_txt = os.path.join(self.tickets_path, f"{txt}")
+            path_to_txt = os.path.join(pdf_path, f"{txt}")
             with open(f"{path_to_txt}") as ticket:
-                # TODO add conidition to only parse tickets not in products table
                 t = [line for line in ticket]
             parsed = self.get_products(t)
             posted = self.post_to_db(parsed, txt[:-4])
@@ -249,12 +241,13 @@ if __name__ == '__main__':
     db.prepare_conn()
 
     # Scrape consum page to retrieve tickets
-    #consum = Page()
-    #consum.scrap()
+    consum = Page()
+    consum.scrap()
 
     # Parse the tickets and insert to db
     parser = TicketParser()
-    parser.load_txt()
+    print(parser.products_loaded)
+    print(parser.tickets_txt)
     parser.read_txt()
     print(parser.errors)
 
