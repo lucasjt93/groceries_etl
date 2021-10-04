@@ -23,13 +23,17 @@ class Page:
 
     # get stored tickets from postgres
     def stored_db(self) -> list():
+        db.prepare_conn()
         db.cur.execute(sql.SQL("SELECT {field} FROM {table}").format(field=sql.Identifier("id"), table=sql.Identifier("tickets")))
+        db.close()
         return [int(item[0]) for item in db.cur.fetchall()]
     
     # post tickets to postgres
     def ticket_to_db(self, id) -> None:
+        db.prepare_conn()
         db.cur.execute(sql.SQL("INSERT INTO {} values (%s, %s)").format(sql.Identifier("tickets")), [id, "now()"])
         db.conn.commit()
+        db.close()
 
     # get webdriver for chrome
     def get_driver(self, pdf) -> webdriver:
@@ -136,7 +140,7 @@ class Page:
     def scrap(self) -> None:
         # lets take the time
         start_time = time.time()
-        print(f"Started at {time.strftime('%Y-%m-%d %H:%M:%SZ', time.localtime(start_time))}")
+        print(f"Started at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
 
         # scrapes the page
         self.go_to_page()
@@ -149,7 +153,7 @@ class Page:
         # stop timer
         end_time = time.time()
 
-        print(f"Finalized at {time.strftime('%Y-%m-%d %H:%M:%SZ', time.localtime(end_time))}")
+        print(f"Finalized at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time))}")
         print(f"Total time: {end_time - start_time}")
 
 
@@ -162,7 +166,9 @@ class TicketParser:
         self.errors = list()
 
     def loaded(self) -> list():
+        db.prepare_conn()
         db.cur.execute(sql.SQL("SELECT DISTINCT({field}) FROM {table}").format(field=sql.Identifier("ticket_id"), table=sql.Identifier("products")))
+        db.close()
         return [int(item[0]) for item in db.cur.fetchall()]
 
     # load tickets.txt into class attributes
@@ -222,33 +228,45 @@ class TicketParser:
                 values.append(value)
 
             try:
+                db.prepare_conn()
                 db.cur.execute(sql.SQL("INSERT INTO {} VALUES (%s, %s, %s, %s, %s)").format(sql.Identifier("products")), values)
                 db.conn.commit()
             except err as error:
                 errors.append(error)
                 db.conn.rollback()
+            finally:
+                db.close()
 
         return errors if errors else None
+    
+    # post errors to .txt
+    def post_errors(self) -> None:
+        timestamp = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
+        if self.errors:
+            with open(Path(f"consum_project/data/{timestamp}_errors.txt"), "w") as file:
+                for e in self.errors:
+                    print(e)
+                    file.write(str(e[0]))
+                print(f"{len(self.errors)} errors added to the log")
 
 
-# instantiate object for calling from DAG
+# instantiate objects for calling from DAG
 def scrapper() -> None:
     consum = Page()
     consum.scrap()
 
+def ticket_parser() -> None:
+    parser = TicketParser()
+    parser.read_txt()
+    parser.post_errors()
+
 
 if __name__ == '__main__':
-    db.prepare_conn()
-
     # Scrape consum page to retrieve tickets
     consum = Page()
     consum.scrap()
 
     # Parse the tickets and insert to db
     parser = TicketParser()
-    print(parser.products_loaded)
-    print(parser.tickets_txt)
     parser.read_txt()
-    print(parser.errors)
-
-    db.close()
+    parser.post_errors()

@@ -1,11 +1,12 @@
 import psycopg2
-
 import configparser
+
 
 # helpers
 def list_to_string(l) -> str:
         str1 = " "
         return str1.join(l)
+
 
 class Db:
     """ Connects to postgreSQL db """
@@ -60,6 +61,7 @@ class Db:
         self.connect()
         self.cursor()
         self.create_schema()
+
 
 db = Db()
 err = psycopg2.DatabaseError
