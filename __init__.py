@@ -7,7 +7,7 @@ import os
 import configparser
 from pathlib import Path
 
-from db import db, err
+from consum_project.db import db, err
 from psycopg2 import sql
 
 # path to folder where tickets are stored
