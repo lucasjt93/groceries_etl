@@ -10,5 +10,5 @@ The first transformation I do is to convert the .pdf to .txt using the pdftotext
 ### Load
 With the same TicketsParser class i load the data into postgres.
 
-### Orchestation
+### Orchestration
 I use Airflow to execute the different scripts everyday as set in the DAG.
