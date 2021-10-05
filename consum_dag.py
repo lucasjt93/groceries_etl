@@ -4,7 +4,6 @@ from airflow.operators.python import PythonOperator
 from consum_project import scrapper, ticket_parser
 from datetime import timedelta, datetime
 
-""" Need to set: export AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=300.0 """
 
 default_args = {
     'owner': 'lucasjt',
