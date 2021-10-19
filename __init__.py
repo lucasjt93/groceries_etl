@@ -11,7 +11,7 @@ from consum_project.db import db, err
 from psycopg2 import sql
 
 # path to folder where tickets are stored
-pdf_path = Path("consum_project/data/tickets_pdf")
+pdf_path = Path("consum/consum_project/data/tickets_pdf")
 
 
 class Page:
@@ -63,7 +63,7 @@ class Page:
     # login using credentials from config
     def login(self) -> None:
         config = configparser.ConfigParser()
-        config.read("consum_project/config.ini")
+        config.read("consum/consum_project/config.ini")
         username = self.driver.find_element_by_id("login")
         username.clear()
         username.send_keys(config["credentials"].get("user"))
@@ -243,7 +243,7 @@ class TicketParser:
     def post_errors(self) -> None:
         timestamp = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
         if self.errors:
-            with open(Path(f"consum_project/data/{timestamp}_errors.txt"), "w") as file:
+            with open(Path(f"consum/consum_project/data/{timestamp}_errors.txt"), "w") as file:
                 for e in self.errors:
                     print(e)
                     file.write(str(e[0]))

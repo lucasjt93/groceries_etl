@@ -17,7 +17,7 @@ class Db:
 
     def config(self) -> None:
         config = configparser.ConfigParser()
-        config.read("consum_project/config.ini")  # read config from config.ini file
+        config.read("consum/consum_project/config.ini")  # read config from config.ini file
 
         if config.has_section("postgresql"):  # ensure the postgresql section is in config.ini
             params = config.items("postgresql")
@@ -46,7 +46,7 @@ class Db:
 
     def create_schema(self) -> None:
         if self.cur:
-            with open("consum_project/schema.sql") as reader:  # open schema.sql file
+            with open("consum/consum_project/schema.sql") as reader:  # open schema.sql file
                 schema = [line for line in reader]
             str_schema = list_to_string(schema)
             schema_split = str_schema.split(";")  # separate SQL statements
