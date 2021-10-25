@@ -249,6 +249,19 @@ class TicketParser:
                     file.write(str(e[0]))
                 print(f"{len(self.errors)} errors added to the log")
 
+class Visualizator:
+    """ Visualize the data from the tickets """
+
+    def __init__(self, query: str) -> None:
+        self.query = query
+    
+    def select_query(self):
+            db.prepare_conn()
+            db.cur.execute(self.query)
+            print(db.cur.fetchall())
+            db.conn.commit()
+            db.close()
+
 
 # instantiate objects for calling from DAG
 def scrapper() -> None:
@@ -263,10 +276,12 @@ def ticket_parser() -> None:
 
 if __name__ == '__main__':
     # Scrape consum page to retrieve tickets
-    consum = Page()
-    consum.scrap()
+    #consum = Page()
+    #consum.scrap()
 
     # Parse the tickets and insert to db
-    parser = TicketParser()
-    parser.read_txt()
-    parser.post_errors()
+    #parser = TicketParser()
+    #parser.read_txt()
+    #parser.post_errors()
+
+    Visualizator("SELECT product, sum(quantity) as q, sum(total) as t FROM products WHERE quantity IS NOT NULL GROUP BY product ORDER BY t desc;").select_query()
