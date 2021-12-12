@@ -198,7 +198,7 @@ class TicketParser:
         for n in range(7, len(ticket_parsed)):  # parsed[7] is where the products start in the ticket
             line = ticket_parsed[n]  # current line in ticket
 
-            if any(code in line for code in ("2902614104014", "2911866831005")):   # this is where the product list ends
+            if any(code in line for code in ("2902614104014", "2911866831005", "42399****")):   # this is where the product list ends
                 break
             
             quantity.append(line[0:5])
